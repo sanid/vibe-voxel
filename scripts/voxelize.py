@@ -22,9 +22,12 @@ from shapely.geometry import LineString, Point
 from shapely.ops import substring
 from shapely.strtree import STRtree
 
-from aoi import CX, CY, D, THETA, W
+from aoi import CITY, CX, CY, D, EPSG, THETA, W
 from osm import OSM
-import landmarks
+if CITY == "berlin":
+    import landmarks_berlin as landmarks  # same API: Berlin's labels, views and curated details
+else:
+    import landmarks
 
 OUT = Path("web/public/data")
 DBG = Path("data/debug")
@@ -442,12 +445,15 @@ for oid, t, line in osm.lines:
         if ln.is_empty or ln.length < 4:
             continue
         solid = (not oneway) and abs(off) < 0.6
-        if solid:
-            lane_lines.append(ln)
-        else:
-            L = ln.length
-            for s in np.arange(1.0, L - 1, 9.0):
-                lane_lines.append(substring(ln, s, min(s + 3, L)))
+        for part in getattr(ln, "geoms", [ln]):  # an offset of a kinked way can come back in pieces (Berlin's ring roads)
+            if part.geom_type != "LineString" or part.length < 4:
+                continue
+            if solid:
+                lane_lines.append(part)
+            else:
+                L = part.length
+                for s in np.arange(1.0, L - 1, 9.0):
+                    lane_lines.append(substring(part, s, min(s + 3, L)))
 lm = np.zeros((D, W), np.uint16)
 burn(lm, [(l, 1) for l in lane_lines], all_touched=False)
 lm_mask = (lm > 0) & np.isin(gcol, [C["asphalt"]])
@@ -509,7 +515,7 @@ for p in parts:
     p["render"] = True
 render = [f for f in feats if f["render"]]
 
-pkin = next(f for f in feats if f["tags"].get("name") == "Pałac Kultury i Nauki")
+pkin = next((f for f in feats if f["tags"].get("name") == "Pałac Kultury i Nauki"), None)  # Warsaw only
 
 
 def tag(f, k):
@@ -730,7 +736,7 @@ def wall_style(f):
         (parse_colour(f["parent"]["tags"].get("building:colour")) if f.get("parent") else None)
     btype = tag(f, "building") or ""
     h = f["maxh"] or float(np.median(top[f["rr"], f["cc"]]))
-    inside_pkin = pkin["geom"].contains(f["geom"].representative_point())
+    inside_pkin = pkin is not None and pkin["geom"].contains(f["geom"].representative_point())
     if inside_pkin:
         # OSM tags the stone #C6AE7F, a khaki; in photos the weathered sandstone is a mid warm grey (median 118,112,104 overcast, 2026)
         if col is None or col == hex_rgb("#c6ae7f"):
@@ -763,7 +769,7 @@ def roof_style(f):
     if col is None and (f["tags"].get("roof:material") or "").lower() == "glass":
         return pal(soften(hex_rgb("#93adbf"), 0.06), M_GLASS)  # glass atrium roofs (Politechnika's hall): blue-grey
     h = float(np.median(top[f["rr"], f["cc"]]))
-    if pkin["geom"].contains(f["geom"].representative_point()) and col == hex_rgb("#666666"):
+    if pkin is not None and pkin["geom"].contains(f["geom"].representative_point()) and col == hex_rgb("#666666"):
         # OSM's dark grey: the ortho shows light stone-grey roofs (its own colours carry the tower's shadow)
         return pal(soften(hex_rgb("#bab3a5"), 0.05), M_ROOF, q=12)
     if h < 40:
@@ -845,6 +851,7 @@ json.dump(THIN_LOG, open("data/debug/thin_parts.json", "w"))
 
 note("OSM roof colours overruled by the ortho:", len(ROOF_OVERRULED), ROOF_OVERRULED[:8])
 H = int(max(topi.max() + g.max(), g.max()) + 12)
+H = max(H, getattr(landmarks, "MIN_H", lambda g_: 0)(g))  # headroom a curated landmark needs (Berlin: the Fernsehturm's antenna)
 note("volume height", H)
 vol = np.zeros((H, D, W), np.uint16)
 
@@ -1709,7 +1716,7 @@ np.savez_compressed("data/debug/pkin_box.npz", vol=vol[:, 2360:2660, 600:900], g
                     pal=np.array(pal.entries, np.int32))  # PKiN's block for facade work (r0=2360, c0=600)
 
 import labels as labels_mod
-labels = labels_mod.assemble(labels, osm, lambda r, c: int(g[r, c] + (topi[r, c] if bmask[r, c] else 0)))
+labels = getattr(landmarks, "assemble", labels_mod.assemble)(labels, osm, lambda r, c: int(g[r, c] + (topi[r, c] if bmask[r, c] else 0)))
 labels_mod.radii(labels, g, g + np.where(bmask, topi, 0))
 
 # ---------------------------------------------------------------- floating debris
@@ -1756,10 +1763,10 @@ for ln in sorted(tram_lines, key=lambda l: -l.length):
         path.append([round(p.x, 1), round(p.y, 1), int(g[r, c])])
     trams.append(path)
 note("tram paths:", len(trams), "total km", round(sum(len(p) for p in trams) * 2 / 1000, 2))
-meta = dict(W=W, D=D, H=Hm, base=BASE, tiles=tile_info, center=[CX, CY], theta_deg=math.degrees(THETA), crs="EPSG:2180", trams=trams, jets=jets,
+meta = dict(W=W, D=D, H=Hm, base=BASE, tiles=tile_info, center=[CX, CY], theta_deg=math.degrees(THETA), crs=f"EPSG:{EPSG}", city=CITY, trams=trams, jets=jets,
             palette=[list(e) for e in pal.entries], lamps=lamps, floods=floods, labels=labels, views=views,
-            sources=dict(osm=osm.timestamp, lidar="GUGiK NMPT/NMT 2025 (GK-FOTO.6201.5.2025)",
-                         ortho="GUGiK ortofotomapa 2025, 5 cm"))
+            sources=dict(osm=osm.timestamp, **landmarks.SOURCES) if hasattr(landmarks, "SOURCES") else
+            dict(osm=osm.timestamp, lidar="GUGiK NMPT/NMT 2025 (GK-FOTO.6201.5.2025)", ortho="GUGiK ortofotomapa 2025, 5 cm"))
 json.dump(meta, open(OUT / "meta.json", "w"))
 import traffic
 # QA aid: drivable-surface mask (1 = carriageway/road area, 2 = tram bed) for web/tools/qa.mjs

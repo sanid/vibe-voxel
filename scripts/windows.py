@@ -19,7 +19,7 @@ from shapely.strtree import STRtree
 from aoi import D, W
 from osm import OSM
 
-OUT = Path(__file__).resolve().parent.parent / "web/public/data/windows.bin"
+OUT = Path("web/public/data/windows.bin")  # relative to the build directory
 KINDS = ["none", "residential", "office", "hotel", "retail", "public", "religious", "other"]
 BY_TAG = {
     "residential": {"apartments", "residential", "house", "detached", "semidetached_house", "terrace", "dormitory"},

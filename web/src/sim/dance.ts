@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { hash, smooth } from '../util';
 import type { LifeMeshes } from './meshes';
+import { CITY } from '../place';
 
 // Zouk evenings on the dark stone disc south-east of Centrum Nauki Kopernik (OSM way 603145360, ~11 x 14 m): couples in
 // close hold rock on the beat and turn about their centre, the follower now and then spun out and back.
@@ -9,7 +10,7 @@ const SHIRTS = ['#b03a48', '#f0f0f0', '#2f2f33', '#d9a441', '#8b5fa8', '#3d6fa8'
 
 // writes the dancers into the people meshes from instance i0 on; returns how many
 export function drawDancers(M: LifeMeshes, i0: number, max: number, t: number, hour: number, ground: number) {
-  if (hour < DANCE.from || hour > DANCE.to || !ground) return 0;
+  if (CITY !== 'warsaw' || hour < DANCE.from || hour > DANCE.to || !ground) return 0; // a Warsaw place
   const n = Math.round(DANCE.couples * Math.min(1, hour - DANCE.from, DANCE.to - hour));
   const beat = t * DANCE.bpm / 60 * Math.PI;
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), tilt = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3();

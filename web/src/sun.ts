@@ -1,4 +1,6 @@
-const RAD = Math.PI / 180, LAT = 52.23 * RAD, LON = 21.01;
+import { PLACE } from './place';
+
+const RAD = Math.PI / 180, LAT = PLACE.lat * RAD, LON = PLACE.lon;
 
 const lastSunday = (year: number, month: number) => { const d = new Date(Date.UTC(year, month + 1, 0)); return d.getUTCDate() - d.getUTCDay(); };
 export const dayOfYear = (d: Date) => Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(d.getFullYear(), 0, 0)) / 864e5);

@@ -19,11 +19,12 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from aoi import RAW  # noqa: E402
+from aoi import CITY, RAW  # noqa: E402
 
-API = "https://archive-api.open-meteo.com/v1/archive?latitude=52.23&longitude=21.01&start_date=1995-01-01&end_date=2024-12-31&timezone=Europe%2FWarsaw"
-DAILY = Path(RAW) / "climate" / "warsaw_daily2.json"
-OUT = Path(__file__).parent.parent / "web/public/data/climate.json"
+PLACE = dict(berlin=("52.52", "13.405", "Europe%2FBerlin", "central Berlin")).get(CITY, ("52.23", "21.01", "Europe%2FWarsaw", "central Warsaw"))
+API = f"https://archive-api.open-meteo.com/v1/archive?latitude={PLACE[0]}&longitude={PLACE[1]}&start_date=1995-01-01&end_date=2024-12-31&timezone={PLACE[2]}"
+DAILY = Path(RAW) / "climate" / ("berlin_daily.json" if CITY == "berlin" else "warsaw_daily2.json")
+OUT = Path("web/public/data/climate.json")  # relative to the build directory (the repo root, or cities/<city>/)
 WINDOW = 10
 
 
@@ -53,7 +54,7 @@ def main():
 
     snowy = per_day(d["time"], (sf > 0.2).astype(float)) > 0
     r = lambda p: [round(float(x), 3) for x in p]
-    json.dump(dict(source="Open-Meteo historical weather API (ERA5), central Warsaw, 1995-2024",
+    json.dump(dict(source=f"Open-Meteo historical weather API (ERA5), {PLACE[3]}, 1995-2024",
                    **{k: r(v) for k, v in kinds.items()}, cover=r(per_day(d["time"], (depth >= 0.02).astype(float))),
                    snowy=[bool(x) for x in snowy]), open(OUT, "w"))
     none = np.nonzero(~snowy)[0] + 1

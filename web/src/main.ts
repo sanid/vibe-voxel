@@ -19,6 +19,7 @@ import { TileStreamer } from './stream';
 import type { Facts, Label, Meta, Place, View } from './types';
 import { dateOf, dayOfYear, hourAt, solarNoon } from './sun';
 import { $, coarsePointer, ease, el, fetchJson, lerp } from './util';
+import { CITY, PLACE } from './place';
 import { pkinLight } from './sky';
 import { type Climate, Precip, typical, type Weather, WEATHERS } from './weather';
 import type { World } from './world';
@@ -63,8 +64,7 @@ nav.cancelFly = () => { fly = null; };
 bar.setRiver(RIVER.typical);
 bar.showRiver(false);
 new ResizeObserver(() => { barRect = null; }).observe(bar.el);
-el('div', '', `<div>by <a href="https://p.migdal.pl/" target="_blank" rel="noopener">Piotr Migdał</a> & <a href="https://quesma.com/blog/invisible-cities-one-shot/" target="_blank" rel="noopener">Opus 5.5</a>, <a href="https://github.com/stared/warsaw-vibe-voxel" target="_blank" rel="noopener">source code</a></div>
-  <div>based on GUGiK 2025 and <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a></div>`).id = 'credits';
+el('div', '', PLACE.credits).id = 'credits';
 if (qs.get('ui') === '0') document.body.classList.add('noui');
 addEventListener('resize', onResize);
 addEventListener('keydown', (e) => {
@@ -196,7 +196,7 @@ function goPlace(x: number, y: number, size: number, pin: Facts | null, name = p
   const g = world.groundAt(x, y), top = world.top(Math.floor(x), Math.floor(y)), h = Math.max(0, top - g);
   labels?.pin(pin && { ...pin, x, y, z: Math.max(top, g + 2) });
   if (nav.mode !== 'orbit') {
-    nav.setWalk({ at: new THREE.Vector3(x + 0.5, g, y + 0.5), deckOK: /^(Most|Kładka|Wiadukt)\b/.test(name) });
+    nav.setWalk({ at: new THREE.Vector3(x + 0.5, g, y + 0.5), deckOK: PLACE.bridge.test(name) });
     return;
   }
   const t = new THREE.Vector3(x + 0.5, g + Math.min(h * 0.5, 60), y + 0.5);
@@ -230,8 +230,8 @@ function searchItems(meta: Meta): SearchItem[] {
     ...meta.labels.map((l) => ({ name: l.name, alt: [l.en, l.alt].join(' '), kind: l.kind, go: () => goPlace(l.x, l.y, Math.max(40, (l.R ?? 20) * 1.4), null, l.name) })),
     { name: 'Follow a tram', alt: 'tramwaj tram ride follow jedź', kind: 'action', go: () => followNearest('tram') },
     { name: 'Follow a car', alt: 'samochód car bus autobus ride follow jedź', kind: 'action', go: () => followNearest('car') },
-    { name: 'Zouk at Kopernik', alt: 'dance taniec zouk Centrum Nauki Kopernik evening wieczór', kind: 'action',
-      go: () => { if (daylight.hour < 19 || daylight.hour > 23) setHour(20.5); goPlace(2626, 2021, 30, { name: 'Zouk', kind: 'dancing in the evenings' }); } },
+    ...(CITY === 'warsaw' ? [{ name: 'Zouk at Kopernik', alt: 'dance taniec zouk Centrum Nauki Kopernik evening wieczór', kind: 'action',
+      go: () => { if (daylight.hour < 19 || daylight.hour > 23) setHour(20.5); goPlace(2626, 2021, 30, { name: 'Zouk', kind: 'dancing in the evenings' }); } }] : []),
     { name: 'Follow someone', alt: 'person people pieszy przechodzień idź walk with follow', kind: 'action', go: () => followNearest('person') },
   ];
 }

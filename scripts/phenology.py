@@ -45,7 +45,7 @@ INAT = ("https://api.inaturalist.org/v1/observations/histogram?place_id=7800,720
         "&taxon_id={t}&date_field=observed&interval=week_of_year&verifiable=true")
 CACHE = Path(RAW) / "dwd"
 YEARS = (1995, 2024)
-OUT = Path(__file__).parent.parent / "web/public/data"
+OUT = Path("web/public/data")  # relative to the build directory (the repo root, or cities/<city>/)
 PHASES = ("leaf", "colour", "fall")
 PHOTOS = Path(__file__).parent / "foliage_photos.json"
 LAWNS = Path(__file__).parent / "grass_photos.json"
@@ -254,7 +254,12 @@ def city_median(table, cls, ph):
 
 
 def main():
-    table = phenology()
+    # PHENOLOGY_TABLE=<phenology.json>: reuse its classes (the DWD series are from stations east of 12.5 deg E, which
+    # covers Berlin as well as Warsaw) and only redo the city medians and foliage.bin for this map's trees
+    import os
+    reuse = os.environ.get("PHENOLOGY_TABLE")
+    prev = json.load(open(reuse)) if reuse else None
+    table = {int(k): v for k, v in prev["classes"].items()} if prev else phenology()
     trees = json.load(open(OUT / "trees.json"))["trees"]
     cls = np.array([classify(t) for t in trees], np.uint8)
     city = {ph: city_median(table, cls, ph) for ph in PHASES}
@@ -263,7 +268,8 @@ def main():
                             "iNaturalist: Leaves annotations, Poland, Germany, Czechia, Slovakia, Lithuania",
                             "autumn colours: Wikimedia Commons photos, scripts/foliage_photos.json",
                             "lawns by month: Wikimedia Commons photos, scripts/grass_photos.json"],
-                   classes=table, grass=grass_tints(), leaf=leaf_tint()), open(OUT / "phenology.json", "w"), indent=1, ensure_ascii=False)
+                   classes=table, grass=prev["grass"] if prev else grass_tints(), leaf=prev["leaf"] if prev else leaf_tint()),
+              open(OUT / "phenology.json", "w"), indent=1, ensure_ascii=False)
 
     xy = np.array([(t["x"], t["y"]) for t in trees])
     print("trees per class:", {int(k): int((cls == k).sum()) for k in np.unique(cls)})

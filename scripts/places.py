@@ -14,7 +14,7 @@ from osm import OSM
 from wikidata import CACHE
 
 
-OUT = Path(__file__).resolve().parent.parent / "web/public/data/places.json"
+OUT = Path("web/public/data/places.json")  # relative to the build directory
 osm = OSM()
 wd = json.loads(CACHE.read_text()) if CACHE.exists() else {}
 PL_KIND = {"place of worship": "kościół church", "station": "dworzec stacja", "stop": "przystanek", "theatre": "teatr",

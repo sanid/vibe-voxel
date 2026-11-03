@@ -17,9 +17,26 @@ from pyproj import Transformer
 from scipy.spatial import cKDTree
 
 sys.path.insert(0, str(Path(__file__).parent))
-from aoi import D, RAW, W, to_grid  # noqa: E402
+from aoi import CITY, D, EPSG, RAW, W, to_grid  # noqa: E402
 
-T4326 = Transformer.from_crs(4326, 2180, always_xy=True)
+T4326 = Transformer.from_crs(4326, EPSG, always_xy=True)
+
+
+def _berlin_city_trees():
+    """Baumbestand Berlin (street and park trees, scripts/berlin_fetch.py) as the 'city' source: Latin species,
+    inventory height and crown diameter (m), trunk girth (cm), planting year. Ids are the inventory's gisid."""
+    f = Path(RAW) / "trees" / "berlin_trees.json"
+    out = []
+    if not f.exists():
+        return out
+    for t in json.load(open(f)):
+        c, r = to_grid(t["x"], t["y"])
+        if not (0 <= c < W and 0 <= r < D):
+            continue
+        out.append(dict(id=f"be:{t['id']}", src="city", x=float(c), y=float(r), species=t.get("species"),
+                        species_pl=None, trunk_cm=_num(t.get("trunk_cm")), height=_num(t.get("height")),
+                        crown_d=_num(t.get("crown")), manager=t.get("layer"), date=t.get("planted")))
+    return out
 
 
 def _num(v):
@@ -31,9 +48,9 @@ def _num(v):
 
 def load(osm_trees):
     """osm_trees: [(oid, tags, Point(col, row))] from voxelize's OSM reader. Returns a list of dicts with grid x, y."""
-    out = []
+    out = _berlin_city_trees() if CITY == "berlin" else []
     bos_f = Path(RAW) / "trees" / "bos_trees.json"
-    if bos_f.exists():
+    if CITY != "berlin" and bos_f.exists():
         for t in json.load(open(bos_f)):
             if t["x2180"] is None:
                 continue

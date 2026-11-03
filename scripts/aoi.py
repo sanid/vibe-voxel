@@ -7,19 +7,38 @@ THETA was measured from 443 OSM wall edges of the PKiN complex (weighted mean 21
 World coords: EPSG:2180 (PL-1992), x = easting, y = northing.
 Grid coords: (i, j) continuous, i = column (along PKiN's E-W facade), j = row (along its N-S facade,
 growing roughly south); cell (c, r) spans [c, c+1) x [r, r+1).
+
+CITY=berlin (environment) switches to Berlin: EPSG:25833 (ETRS89 / UTM 33N), anchored on the Fernsehturm and
+rotated 6.4 deg to the Friedrichstadt / Unter den Linden grid (length-weighted circular mean of 4073 OSM building
+edges between Leipziger Str. and the Linden, mod 90; concentration 0.86). The Berlin build runs in cities/berlin/,
+so the relative paths below (data/raw, data/cache, web/public/data) land in its own folders.
 """
 import math
+import os
 
 import numpy as np
 
-CX, CY = 636965.62, 486975.12  # PKiN spire (OSM way 240119160), EPSG:2180
-THETA = math.radians(21.5)
-# 3950 x 4430 m: from the Rondo ONZ towers east across the Vistula to PGE Narodowy, north past the Old Town and the
-# New Town (Plac Zamkowy, the Rynek, the Barbican, Rynek Nowego Miasta and a street or two beyond), south past Trasa
-# Łazienkowska (Al. Armii Ludowej down to Politechnika, Most Łazienkowski). The Old Town strip added 1280 rows on the
-# north: the earlier map is j in [1280, 4430), the same cells.
-W, D = 3950, 4430
-I0, J0 = 750, 2510  # grid position of the PKiN spire
+CITY = os.environ.get("CITY", "warsaw")
+
+if CITY == "berlin":
+    EPSG = 25833
+    CX, CY = 392081.1, 5820156.2  # Fernsehturm spire, from 52.520815 N, 13.409419 E
+    THETA = math.radians(6.4)
+    # 3300 x 1500 m: from the Reichstag lawn and the Brandenburger Tor east along Unter den Linden over Museum Island
+    # to the Fernsehturm and Alexanderplatz; north to Hackescher Markt and the Bode-Museum, south past Gendarmenmarkt,
+    # the Nikolaiviertel and Jannowitzbruecke on the Spree.
+    W, D = 3300, 1500
+    I0, J0 = 2500, 600  # grid position of the Fernsehturm
+else:
+    EPSG = 2180
+    CX, CY = 636965.62, 486975.12  # PKiN spire (OSM way 240119160), EPSG:2180
+    THETA = math.radians(21.5)
+    # 3950 x 4430 m: from the Rondo ONZ towers east across the Vistula to PGE Narodowy, north past the Old Town and the
+    # New Town (Plac Zamkowy, the Rynek, the Barbican, Rynek Nowego Miasta and a street or two beyond), south past Trasa
+    # Łazienkowska (Al. Armii Ludowej down to Politechnika, Most Łazienkowski). The Old Town strip added 1280 rows on the
+    # north: the earlier map is j in [1280, 4430), the same cells.
+    W, D = 3950, 4430
+    I0, J0 = 750, 2510  # grid position of the PKiN spire
 RAW = "data/raw"
 
 EU = np.array([math.cos(THETA), math.sin(THETA)])   # grid +i in world

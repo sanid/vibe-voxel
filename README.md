@@ -79,6 +79,38 @@ OSM comes from the daily Geofabrik extract for Mazowieckie, cut to the AOI by `s
 as Overpass `out geom(bbox)` (the 4 × 3 km query is too heavy for the public Overpass servers; `OVERPASS=1` uses them).
 GUGiK sheet ids come from the orthophoto index WFS (`PZGIK/ORTO/WFS/Skorowidze`).
 
+## Berlin (`/berlin/`)
+
+The same engine and the same pipeline build Berlin Mitte: a 3300 × 1500 m map from the Reichstag lawn and the
+Brandenburger Tor along Unter den Linden over Museum Island to the Fernsehturm and Alexanderplatz, anchored on the
+Fernsehturm and rotated 6.4° to the Friedrichstadt grid (length-weighted mean of 4073 OSM building edges, mod 90).
+The page is `web/berlin/index.html`; its relative `data/` fetches land in `web/public/berlin/data/`, and
+`web/src/place.ts` switches the sun's position, the credits and the Warsaw-only bits (Zouk, the Vistula gauge).
+
+```sh
+sh scripts/build_berlin.sh    # ~1.4 GB of downloads on first run (cached in cities/berlin/data/raw), then ~15 min, ~10 GB RAM peak
+```
+
+`scripts/aoi.py` switches on `CITY=berlin`, and the build runs in `cities/berlin/`, so every relative path of the
+Warsaw scripts (`data/raw`, `data/cache`, `web/public/data`) lands in Berlin's own folders. Berlin's open data stands
+in for each Warsaw source (`scripts/berlin_fetch.py`, `scripts/berlin_prep.py`):
+
+| Warsaw | Berlin |
+|---|---|
+| GUGiK NMPT 2025 (LiDAR surface, 0.5 m) | DOM1, Geoportal Berlin: image-matched surface, 1 m, 2021 |
+| GUGiK NMT 2025 (terrain, 1 m) | DGM1, Geoportal Berlin: terrain, 1 m |
+| GUGiK orthophoto 2025 | TrueDOP 2024, 20 cm (WMS `truedop_2024`): a true orthophoto, buildings do not lean |
+| Geofabrik Mazowieckie extract | BBBike Berlin extract (Geofabrik and Overpass are unreachable from the build box), cut by `osm_pbf.py` |
+| city tree databases | Baumbestand Berlin, street and park trees (WFS), checked against the service's own counts |
+| `landmarks.py` | `landmarks_berlin.py`: labels, views, the Nikolaiviertel as the tiled "historic core", sandstone and copper for the landmarks, the Fernsehturm rebuilt to its 368 m antenna (the surface model smears the shaft and misses the mast), the Brandenburger Tor's five passages |
+
+Reused as they are: the phenology table (its DWD series are from stations east of 12.5° E, Berlin's region too;
+`foliage.bin` is rebuilt from Berlin's trees) and the lit-window statistics. Not yet Berlin's own:
+- `climate.json` is Warsaw's ERA5 climatology, labelled as a stand-in, because Open-Meteo refused the Berlin request
+  (daily limit). Rerun `CITY=berlin scripts/climate.py` from `cities/berlin/`.
+- No river gauge: `flood.py` is the Vistula's. The Spree is held at its surveyed level.
+- The surface model is from 2021. Buildings finished since stand at their OSM height, as in Warsaw.
+
 ## Known limits
 - Windows are procedural, generated in the shader from floor height and material. They are not real window positions.
 - OSM maps 44 of the 81 elms reported on Złota, and only those 44 are drawn.
