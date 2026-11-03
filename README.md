@@ -106,8 +106,6 @@ in for each Warsaw source (`scripts/berlin_fetch.py`, `scripts/berlin_prep.py`):
 
 Reused as they are: the phenology table (its DWD series are from stations east of 12.5° E, Berlin's region too;
 `foliage.bin` is rebuilt from Berlin's trees) and the lit-window statistics. Not yet Berlin's own:
-- `climate.json` is Warsaw's ERA5 climatology, labelled as a stand-in, because Open-Meteo refused the Berlin request
-  (daily limit). Rerun `CITY=berlin scripts/climate.py` from `cities/berlin/`.
 - No river gauge: `flood.py` is the Vistula's. The Spree is held at its surveyed level.
 - The surface model is from 2021. Buildings finished since stand at their OSM height, as in Warsaw.
 
