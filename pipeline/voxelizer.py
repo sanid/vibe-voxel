@@ -29,13 +29,15 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dgm_height_clamp import Terrain, clamp_offset, footprint_terrain_min, load_dgm1_xyz  # noqa: E402
+from materials import MATERIALS  # noqa: E402
 from preprocess_citygml import Building, newell_plane, parse_tile, plane_height  # noqa: E402
+from landmark_overrides import apply_fernsehturm  # noqa: E402
+from tree_synthesizer import add_trees, load_trees  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
 PROCESSED = ROOT / "data" / "processed"
 
-MATERIALS = {"air": 0, "ground": 1, "building": 2, "wall": 3, "roof": 4}
 EXTRUDE_M = 2  # building columns sink this far into the terrain, to hide seams
 
 
@@ -158,6 +160,10 @@ def build(e_km: int, n_km: int, rows: int = 1000, cols: int = 1000) -> dict:
     vox[bcol & exposed & (k < top_idx[None])] = MATERIALS["wall"]
     vox[(k == top_idx[None]) & has_b[None]] = MATERIALS["roof"]
 
+    tree_files = sorted((RAW / "trees").glob(f"{tile}_*.json"))
+    tree_report = add_trees(vox, t_idx, origin_e, origin_n, load_trees(tree_files)) if tree_files else {}
+    vox, landmark_report = apply_fernsehturm(vox, z_base, origin_e, origin_n)
+
     PROCESSED.mkdir(parents=True, exist_ok=True)
     out = PROCESSED / f"voxels_{tile}.npz"
     np.savez_compressed(
@@ -174,8 +180,8 @@ def build(e_km: int, n_km: int, rows: int = 1000, cols: int = 1000) -> dict:
     counts = {name: int((vox == v).sum()) for name, v in MATERIALS.items()}
     report = {
         "tile": tile,
-        "grid": {"cols": cols, "rows": rows, "nz": nz, "z_base_m": z_base,
-                 "z_top_m": z_base + nz},
+        "grid": {"cols": cols, "rows": rows, "nz": int(vox.shape[0]), "z_base_m": z_base,
+                 "z_top_m": z_base + int(vox.shape[0])},
         "terrain_m": {"min": round(float(terrain.z.min()), 2), "max": round(float(terrain.z.max()), 2)},
         "buildings": {"total": len(buildings), "placed": len(dzs), "without_roof_cells": no_cells,
                       "without_ground_surface": no_ground},
@@ -187,6 +193,8 @@ def build(e_km: int, n_km: int, rows: int = 1000, cols: int = 1000) -> dict:
             "abs_over_3m": int((np.abs(dz_arr) > 3).sum()),
         } if dz_arr.size else {},
         "voxel_counts": counts,
+        "trees": tree_report,
+        "landmarks": {"fernsehturm": landmark_report},
         "output": str(out.relative_to(ROOT)),
     }
     (PROCESSED / f"report_{tile}.json").write_text(json.dumps(report, indent=2))

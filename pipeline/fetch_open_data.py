@@ -38,6 +38,40 @@ def get_dgm1_url(e_km: int, n_km: int) -> str:
     return f"{BASE}/DGM1/DGM1_{e_km}_{n_km}.zip"
 
 
+WFS_TREES = "https://gdi.berlin.de/services/wfs/baumbestand"
+TREE_LAYERS = ("strassenbaeume", "anlagenbaeume")  # street trees, park and facility trees
+TREES_DIR = RAW / "trees"
+
+
+def get_trees_url(e_km: int, n_km: int, layer: str) -> str:
+    """WFS 2.0 GetFeature for one 1 km tile, as GeoJSON in EPSG:25833."""
+    x0, y0 = e_km * 1000, n_km * 1000
+    return (f"{WFS_TREES}?service=WFS&version=2.0.0&request=GetFeature"
+            f"&typeNames=baumbestand:{layer}&outputFormat=application/json"
+            f"&srsName=urn:ogc:def:crs:EPSG::25833"
+            f"&bbox={x0},{y0},{x0 + 1000},{y0 + 1000},urn:ogc:def:crs:EPSG::25833")
+
+
+def fetch_trees(e_km: int, n_km: int) -> list[Path]:
+    """Download the tree layers for a tile. Checks the feature count against the
+    service's own numberMatched, since the WFS can return fewer features than it holds."""
+    import json
+
+    out = []
+    for layer in TREE_LAYERS:
+        dest = TREES_DIR / f"{e_km}_{n_km}_{layer}.json"
+        download(get_trees_url(e_km, n_km, layer), dest)
+        hits = requests.get(get_trees_url(e_km, n_km, layer) + "&resultType=hits", timeout=120)
+        hits.raise_for_status()
+        matched = int(hits.text.split('numberMatched="')[1].split('"')[0])
+        got = len(json.loads(dest.read_text())["features"])
+        if got != matched:
+            raise ValueError(f"{layer}: got {got} features, service reports {matched}")
+        print(f"  trees {layer}: {got} features")
+        out.append(dest)
+    return out
+
+
 def download(url: str, dest: Path) -> Path:
     """Stream url to dest unless it is already there. Writes via a .part file."""
     if dest.exists() and dest.stat().st_size > 0:
@@ -83,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--tiles", nargs="*", type=parse_tile, metavar="E,N",
                     help="tile corners in whole km, e.g. 392,5820 (default: the test tile)")
     ap.add_argument("--no-extract", action="store_true", help="download only")
+    ap.add_argument("--no-trees", action="store_true", help="skip the Baumbestand tree layers")
     args = ap.parse_args(argv)
 
     tiles = args.tiles or TEST_TILES
@@ -103,6 +138,12 @@ def main(argv: list[str] | None = None) -> int:
             except (requests.RequestException, zipfile.BadZipFile, ValueError) as exc:
                 print(f"  {label} FAILED: {exc}", file=sys.stderr)
                 failed.append((label, e_km, n_km))
+        if not args.no_trees:
+            try:
+                fetch_trees(e_km, n_km)
+            except (requests.RequestException, ValueError, IndexError) as exc:
+                print(f"  trees FAILED: {exc}", file=sys.stderr)
+                failed.append(("trees", e_km, n_km))
     if failed:
         print(f"{len(failed)} download(s) failed", file=sys.stderr)
         return 1
