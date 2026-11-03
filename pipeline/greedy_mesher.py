@@ -8,7 +8,9 @@ Steps:
      runs with the same start, length and material across consecutive rows.
      Vectorized: no per-face Python loop. This is not a full 2D greedy merge;
      it is usually close on LoD2 blocks.
-  4. Write each chunk as packed 16-byte quads, gzipped.
+  4. Write each chunk as packed 16-byte quads, raw. Compression is left to the
+     web server's transport encoding: a stored .gz file is decoded by browsers
+     that see Content-Encoding: gzip, so a client-side gunzip would fail.
 
 Quad record (little-endian, 16 bytes):
     x, y, z   u16   voxel index of the solid voxel's min corner in the tile grid
@@ -23,7 +25,6 @@ The blueprint used u8 for w and h; u16 is needed because a vertical wall can be
 
 from __future__ import annotations
 
-import gzip
 import json
 import struct
 import sys
@@ -175,9 +176,8 @@ def write_chunks(vox: np.ndarray, out_dir: Path, z_base: int, origin_e: int, ori
     for cy in range((ny + CHUNK - 1) // CHUNK):
         for cx in range((nx + CHUNK - 1) // CHUNK):
             recs = chunk_records(vox, cx, cy, faces)
-            name = f"chunk_{cx}_{cy}.bin.gz"
-            with gzip.open(out_dir / name, "wb", compresslevel=9) as f:
-                f.write(recs.tobytes())
+            name = f"chunk_{cx}_{cy}.bin"
+            (out_dir / name).write_bytes(recs.tobytes())
             n = recs.shape[0]
             total_quads += n
             if n:
