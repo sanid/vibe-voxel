@@ -35,35 +35,32 @@ Corrections to the blueprint found along the way:
 - [x] Viewer: second page, `web/src/place.ts` for the sun's position, credits and Warsaw-only features.
 - [x] One-command rebuild: `sh scripts/build_berlin.sh`.
 - [x] Checked in headless Chromium (software GL): loads in ~80 s; day, golden hour and night render.
+- [x] Berlin climate (`scripts/climate.py`, `web/public/berlin/data/climate.json`): Open-Meteo ERA5 1995-2024 archive for central Berlin.
+- [x] Spree river handling (`web/src/main.ts`): the Vistula flood simulation and river gauge UI are hidden and disabled for Berlin; the Spree is held at its surveyed level.
+- [x] German and English search keywords for Berlin places (`scripts/places.py`, `web/public/berlin/data/places.json`).
+- [x] Berlin preview metadata (`web/berlin/index.html`): `og:image`, `og:url`, Twitter summary and dimensions configured.
 
 ## Next
 
 Ordered by what most improves the result for the effort.
 
-1. **Berlin climate.** `climate.json` is Warsaw's, labelled as a stand-in, because Open-Meteo refused the request
-   (daily limit). Rerun `CITY=berlin uv run --project ../.. python ../../scripts/climate.py` from `cities/berlin/`
-   with `PYTHONPATH=../../scripts`, then copy nothing: it writes `web/public/berlin/data/climate.json`.
-2. **The 19 m depression by Alexanderplatz** (~392350-392500 E, 5820050-5820375 N, 13 m below the Spree's level).
+1. **The 19 m depression by Alexanderplatz** (~392350-392500 E, 5820050-5820375 N, 13 m below the Spree's level).
    Check it against the TrueDOP and OSM (likely a construction pit). If it is a pit, leave it; if it is a data gap,
    fill it from the neighbouring terrain in `berlin_prep.py`.
-3. **Real GPU check.** The renders so far are SwiftShader. Run `web/tools/shot.mjs` with `URL=http://localhost:5173/berlin/`
+2. **Real GPU check.** The renders so far are SwiftShader. Run `web/tools/shot.mjs` with `URL=http://localhost:5173/berlin/`
    on a machine with a GPU, and the phone engine (`?shape=budget`), to measure load time and frame rate.
-4. **More landmark curation**, as Warsaw has for its own:
+3. **More landmark curation**, as Warsaw has for its own:
    - Reichstag: the glass dome (the surface model shows it as a blob).
    - Berliner Dom: cleaner dome shapes (the image-matched surface is lumpy).
    - Brandenburger Tor: OSM's main block is 34 m long; check the passage widths against photos.
    - Park Inn and the Alexanderplatz towers: facades read as blue glass; Park Inn is pale with dark windows.
    - Konzerthaus, Französischer and Deutscher Dom, Rotes Rathaus tower: compare with photos from the same viewpoint.
-5. **Tiergarten trees.** The spring orthophoto shows bare crowns, so park trees come mostly from the canopy height
+4. **Tiergarten trees.** The spring orthophoto shows bare crowns, so park trees come mostly from the canopy height
    and read as tall columns. Use a summer orthophoto (another TrueDOP year) for the leaf colour, or cap and widen
    crowns from the tree register's crown diameters.
-6. **Spree.** No river gauge (`flood.py` is the Vistula's). Either hide the river UI for Berlin explicitly or write a
-   Spree version with its regulated level (Mühlendamm lock).
-7. **Larger map.** Extend west over the Tiergarten to the Siegessäule and Potsdamer Platz, or east along
+5. **Larger map.** Extend west over the Tiergarten to the Siegessäule and Potsdamer Platz, or east along
    Karl-Marx-Allee. Memory grows with the area: ~10 GB peak at 3300 x 1500 m.
-8. **Search and labels.** Add Wikidata-ranked labels as Warsaw has (`scripts/notable.py`, `scripts/labels.py`), and
-   German/English search keywords in `scripts/places.py` (its kind keywords are Polish).
-9. **Publish.** Build `web/` and host both pages; add a Berlin `og:image` preview to `web/berlin/index.html`.
+6. **Search and labels.** Add Wikidata-ranked labels as Warsaw has (`scripts/notable.py`, `scripts/labels.py`).
 
 ## Files
 

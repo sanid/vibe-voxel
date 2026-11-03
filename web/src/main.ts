@@ -282,8 +282,12 @@ async function boot() {
   fetchJson<{ places: Place[] }>('data/places.json').then(({ places }) => bar.search.setItems([...searchItems(meta),
     ...places.map(([name, kind, x, y, size, alt]) => ({ name, alt, kind, go: () => goPlace(x, y, size, { name, kind }) }))]));
   fountains = new Fountains(scene, meta.jets ?? []);
-  flood = new Flood(scene, uniforms, meta);
-  flood.load().then(() => { bar.river.input.disabled = false; flood!.setGauge(RIVER.typical); }).catch((e) => console.warn('flood', e));
+  if (CITY === 'warsaw') {
+    flood = new Flood(scene, uniforms, meta);
+    flood.load().then(() => { bar.river.input.disabled = false; flood!.setGauge(RIVER.typical); }).catch((e) => console.warn('flood', e));
+  } else {
+    bar.showRiver(false);
+  }
   fetchJson<TrafficData>('data/traffic.json').then((td) => {
     life = nav.life = new StreetLife(scene, td);
     life.world = world;

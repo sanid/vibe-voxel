@@ -9,7 +9,7 @@ from pathlib import Path
 
 from shapely.ops import unary_union
 
-from aoi import W, D
+from aoi import CITY, W, D
 from osm import OSM
 from wikidata import CACHE
 
@@ -17,10 +17,22 @@ from wikidata import CACHE
 OUT = Path("web/public/data/places.json")  # relative to the build directory
 osm = OSM()
 wd = json.loads(CACHE.read_text()) if CACHE.exists() else {}
-PL_KIND = {"place of worship": "kościół church", "station": "dworzec stacja", "stop": "przystanek", "theatre": "teatr",
-           "museum": "muzeum", "gallery": "galeria", "library": "biblioteka", "university": "uczelnia uniwersytet",
-           "park": "ogród", "square": "plac", "street": "ulica", "cinema": "kino", "hotel": "hotel", "memorial": "pomnik",
-           "artwork": "rzeźba", "restaurant": "restauracja", "cafe": "kawiarnia", "school": "szkoła", "hospital": "szpital"}
+KIND_ALIASES = {
+    "berlin": {
+        "place of worship": "Kirche church cathedral Dom", "station": "Bahnhof station train", "stop": "Haltestelle stop tram bus",
+        "theatre": "Theater theatre stage", "museum": "Museum museum", "gallery": "Galerie gallery", "library": "Bibliothek library",
+        "university": "Universität university Hochschule", "park": "Park Garten park garden", "square": "Platz square",
+        "street": "Straße street alley", "cinema": "Kino cinema", "hotel": "Hotel hotel", "memorial": "Denkmal memorial",
+        "artwork": "Skulptur Kunst artwork sculpture", "restaurant": "Restaurant restaurant", "cafe": "Café cafe",
+        "school": "Schule school", "hospital": "Krankenhaus hospital Klinik", "building": "Gebäude building Haus",
+    },
+    "warsaw": {
+        "place of worship": "kościół church", "station": "dworzec stacja", "stop": "przystanek", "theatre": "teatr",
+        "museum": "muzeum", "gallery": "galeria", "library": "biblioteka", "university": "uczelnia uniwersytet",
+        "park": "ogród", "square": "plac", "street": "ulica", "cinema": "kino", "hotel": "hotel", "memorial": "pomnik",
+        "artwork": "rzeźba", "restaurant": "restauracja", "cafe": "kawiarnia", "school": "szkoła", "hospital": "szpital"
+    }
+}.get(CITY, {})
 
 
 def inside(x, y):
@@ -58,7 +70,7 @@ def english(t):
 def add(name, kind, geom, alt=""):
     if not kind:
         return
-    alt = " ".join(filter(None, [alt, PL_KIND.get(kind)]))
+    alt = " ".join(filter(None, [alt, KIND_ALIASES.get(kind)]))
     p = geom.representative_point() if geom.geom_type != "Point" else geom
     if not inside(p.x, p.y):
         return
@@ -87,27 +99,28 @@ for _, t, pt in osm.nodes:
     if t.get("name"):
         add(t["name"], kind_of(t), pt, english(t))
 
-# the Finnish houses of Osiedle Jazdów (1945, ~27 left; Otwarty Jazdów: NGOs, culture and grassroots groups): every
-# one found by its address ("Jazdów 3/5") and by "domki fińskie", named after its OSM name or the groups inside it
-import re
-jazdow = unary_union(streets.get("Jazdów", [])).buffer(120) if streets.get("Jazdów") else None
-domki = []
-for _, _, t, poly in osm.areas:
-    nr = t.get("addr:housenumber", "")
-    if jazdow is None or t.get("building") not in ("detached", "house", "ruins", "yes") or not re.fullmatch(r"\d+A?/\d+", nr) \
-            or not jazdow.contains(poly.representative_point()):
-        continue
-    inside_ = [t2["name"] for _, t2, pt in osm.nodes if t2.get("name") and poly.buffer(1.5).contains(pt)]
-    name = t.get("name") or (inside_[0] if len(inside_) == 1 else f"Jazdów {nr}")
-    alt = " ".join([f"Jazdów {nr}", "domek fiński Finnish house", *[n for n in inside_ if n != name]])
-    c = poly.representative_point()
-    for k in [k for k, r in best.items() if k[0] == name and (r[2] - c.x) ** 2 + (r[3] - c.y) ** 2 < 30 ** 2]:
-        del best[k]  # the same house under its amenity/office kind
-    add(name, "domek fiński", poly, alt)
-    domki.append(poly)
-if domki:
-    add("Domki fińskie", "Osiedle Jazdów", unary_union(domki).convex_hull, "Finnish houses Otwarty Jazdów Jazdow")
-    print(len(domki), "Finnish houses on Jazdów")
+if CITY == "warsaw":
+    # the Finnish houses of Osiedle Jazdów (1945, ~27 left; Otwarty Jazdów: NGOs, culture and grassroots groups): every
+    # one found by its address ("Jazdów 3/5") and by "domki fińskie", named after its OSM name or the groups inside it
+    import re
+    jazdow = unary_union(streets.get("Jazdów", [])).buffer(120) if streets.get("Jazdów") else None
+    domki = []
+    for _, _, t, poly in osm.areas:
+        nr = t.get("addr:housenumber", "")
+        if jazdow is None or t.get("building") not in ("detached", "house", "ruins", "yes") or not re.fullmatch(r"\d+A?/\d+", nr) \
+                or not jazdow.contains(poly.representative_point()):
+            continue
+        inside_ = [t2["name"] for _, t2, pt in osm.nodes if t2.get("name") and poly.buffer(1.5).contains(pt)]
+        name = t.get("name") or (inside_[0] if len(inside_) == 1 else f"Jazdów {nr}")
+        alt = " ".join([f"Jazdów {nr}", "domek fiński Finnish house", *[n for n in inside_ if n != name]])
+        c = poly.representative_point()
+        for k in [k for k, r in best.items() if k[0] == name and (r[2] - c.x) ** 2 + (r[3] - c.y) ** 2 < 30 ** 2]:
+            del best[k]  # the same house under its amenity/office kind
+        add(name, "domek fiński", poly, alt)
+        domki.append(poly)
+    if domki:
+        add("Domki fińskie", "Osiedle Jazdów", unary_union(domki).convex_hull, "Finnish houses Otwarty Jazdów Jazdow")
+        print(len(domki), "Finnish houses on Jazdów")
 
 places = sorted(best.values(), key=lambda r: (RANK.get(r[1], 6), -r[4]))
 OUT.write_text(json.dumps({"places": places}, ensure_ascii=False, separators=(",", ":")))
